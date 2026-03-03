@@ -330,8 +330,7 @@ class SGLangHttpServer:
         prompt_ids: torch.Tensor,
         sampling_params: dict[str, Any],
         request_id: str,
-        image_data: Optional[list[Any]] = None,
-        video_data: Optional[list[Any]] = None,
+        multi_modal_data: Optional[dict[str, Any]] = None,
     ) -> TokenOutput:
         """Generate sequence with token-in-token-out."""
         # TODO(@wuxibin): switch to `/generate` http endpoint once multi-modal support ready.
@@ -365,9 +364,9 @@ class SGLangHttpServer:
             "input_ids": prompt_ids,
             "sampling_params": sampling_params,
             "return_logprob": return_logprob,
-            "image_data": image_data,
+            "image_data": multi_modal_data.get("image") if multi_modal_data else None,
             # TODO: support video input for sglang
-            # video_data=video_data,
+            # video_data=multi_modal_data.get("video") if multi_modal_data else None,
         }
 
         if self.config.enable_rollout_routing_replay:

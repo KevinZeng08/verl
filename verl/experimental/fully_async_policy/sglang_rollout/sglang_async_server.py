@@ -66,8 +66,7 @@ class SGLangHttpServerForPartial(SGLangHttpServer):
         prompt_ids: torch.Tensor,
         sampling_params: dict[str, Any],
         request_id: str,
-        image_data: Optional[list[Any]] = None,
-        video_data: Optional[list[Any]] = None,
+        multi_modal_data: Optional[dict[str, Any]] = None,
     ) -> None:
         sampling_params = dict(sampling_params)
 
@@ -86,6 +85,7 @@ class SGLangHttpServerForPartial(SGLangHttpServer):
         return_logprob = True
         from sglang.srt.managers.io_struct import GenerateReqInput
 
+        video_data = multi_modal_data.get("video") if multi_modal_data else None
         if video_data is not None and len(video_data) > 0:
             logger.warning(
                 f"Request {request_id} received video_data but it is not used. "
@@ -99,7 +99,7 @@ class SGLangHttpServerForPartial(SGLangHttpServer):
             input_ids=prompt_ids,
             sampling_params=sampling_params,
             return_logprob=return_logprob,
-            image_data=image_data,
+            image_data=multi_modal_data.get("image") if multi_modal_data else None,
             # TODO: support video input for sglang
             # video_data=video_data,
         )
@@ -115,8 +115,7 @@ class SGLangHttpServerForPartial(SGLangHttpServer):
         prompt_ids: torch.Tensor,
         sampling_params: dict[str, Any],
         request_id: str,
-        image_data: Optional[list[Any]] = None,
-        video_data: Optional[list[Any]] = None,
+        multi_modal_data: Optional[dict[str, Any]] = None,
     ) -> tuple[list[int], list[float], bool]:
         async with self.lock:
             if self.paused:
@@ -125,7 +124,7 @@ class SGLangHttpServerForPartial(SGLangHttpServer):
             self.cancel_event[request_id] = asyncio.Event()
             cancel_handle = asyncio.create_task(self.cancel_event[request_id].wait())
             generation_handle = asyncio.create_task(
-                self._generate_step(prompt_ids, sampling_params, request_id, image_data, video_data)
+                self._generate_step(prompt_ids, sampling_params, request_id, multi_modal_data)
             )
         done, pending = await asyncio.wait(
             [generation_handle, cancel_handle],

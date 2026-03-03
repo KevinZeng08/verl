@@ -134,8 +134,7 @@ class FullyAsyncLLMServerManager(AsyncLLMServerManager):
         *,
         prompt_ids: list[int],
         sampling_params: dict[str, Any],
-        image_data: Optional[list[Any]] = None,
-        video_data: Optional[list[Any]] = None,
+        multi_modal_data: Optional[dict[str, Any]] = None,
     ) -> tuple[list[Any], list[Any], Any] | tuple[Sequence[int], list[float], bool]:
         """Generate tokens from prompt ids, used for async partial.
 
@@ -143,6 +142,7 @@ class FullyAsyncLLMServerManager(AsyncLLMServerManager):
             request_id (str): request id for sticky session.
             prompt_ids (List[int]): List of prompt token ids.
             sampling_params (Dict[str, Any]): Sampling parameters for the chat completion.
+            multi_modal_data (Optional[Dict[str, Any]]): Multi-modal data (image, video, audio, etc.).
 
         Returns:
             output: A tuple representing the generation output.
@@ -155,8 +155,7 @@ class FullyAsyncLLMServerManager(AsyncLLMServerManager):
             request_id=request_id,
             prompt_ids=prompt_ids,
             sampling_params=sampling_params,
-            image_data=image_data,
-            video_data=video_data,
+            multi_modal_data=multi_modal_data,
         )
         return output
 

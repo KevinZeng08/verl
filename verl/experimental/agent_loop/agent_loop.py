@@ -105,8 +105,7 @@ class AsyncLLMServerManager:
         *,
         prompt_ids: list[int],
         sampling_params: dict[str, Any],
-        image_data: Optional[list[Any]] = None,
-        video_data: Optional[list[Any]] = None,
+        multi_modal_data: Optional[dict[str, Any]] = None,
     ) -> TokenOutput:
         """Generate tokens from prompt ids.
 
@@ -114,6 +113,7 @@ class AsyncLLMServerManager:
             request_id (str): request id for sticky session.
             prompt_ids (List[int]): List of prompt token ids.
             sampling_params (Dict[str, Any]): Sampling parameters for the chat completion.
+            multi_modal_data (Optional[Dict[str, Any]]): Multi-modal data (image, video, audio, etc.).
 
         Returns:
             TokenOutput: token output
@@ -123,8 +123,7 @@ class AsyncLLMServerManager:
             request_id=uuid4().hex,  # use new request_id for each turn
             prompt_ids=prompt_ids,
             sampling_params=sampling_params,
-            image_data=image_data,
-            video_data=video_data,
+            multi_modal_data=multi_modal_data,
         )
         return output
 
@@ -251,6 +250,7 @@ class AgentLoopBase(ABC):
 
         return multi_modal_data
 
+    # TODO: update this interface support omni models
     async def apply_chat_template(
         self,
         messages: list[dict],

@@ -37,8 +37,11 @@ class SingleTurnAgentLoop(AgentLoopBase):
 
         # 1. extract images and videos from messages
         multi_modal_data = await self.process_vision_info(messages)
-        images = multi_modal_data.get("images")
-        videos = multi_modal_data.get("videos")
+        # Convert plural keys to singular keys for backend compatibility
+        # TODO: update this interface
+        multi_modal_data = {k.rstrip("s"): v for k, v in multi_modal_data.items() if v is not None}
+        images = multi_modal_data.get("image")
+        videos = multi_modal_data.get("video")
 
         # 2. apply chat template and tokenize
         prompt_ids = await self.apply_chat_template(
@@ -54,8 +57,7 @@ class SingleTurnAgentLoop(AgentLoopBase):
                 request_id=uuid4().hex,
                 prompt_ids=prompt_ids,
                 sampling_params=sampling_params,
-                image_data=images,
-                video_data=videos,
+                multi_modal_data=multi_modal_data,
             )
         if metrics.get("num_preempted") is None:
             metrics["num_preempted"] = output.num_preempted if output.num_preempted is not None else -1

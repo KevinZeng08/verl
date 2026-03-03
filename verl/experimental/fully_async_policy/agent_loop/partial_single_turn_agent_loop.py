@@ -39,8 +39,10 @@ class PartialSingleTurnAgentLoop(AgentLoopBase):
         output: Optional[AgentLoopOutput] = kwargs.get("output", None)
         messages = list(kwargs["raw_prompt"])
         multi_modal_data = await self.process_vision_info(messages)
-        images = multi_modal_data.get("images")
-        videos = multi_modal_data.get("videos")
+        # Convert plural keys to singular keys for backend compatibility
+        multi_modal_data = {k.rstrip("s"): v for k, v in multi_modal_data.items() if v is not None}
+        images = multi_modal_data.get("image")
+        videos = multi_modal_data.get("video")
 
         param_version = kwargs.get("param_version", 0)
 
@@ -101,8 +103,7 @@ class PartialSingleTurnAgentLoop(AgentLoopBase):
                 request_id=request_id,
                 prompt_ids=prompt_ids,
                 sampling_params=sampling_params,
-                image_data=images,
-                video_data=videos,
+                multi_modal_data=multi_modal_data,
             )
         if not output:
             response_mask = [1] * len(response_ids)

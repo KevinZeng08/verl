@@ -83,8 +83,8 @@ class AsyncPartialToolAgentLoop(ToolAgentLoop):
     async def _init_agent_data(self, kwargs: dict, param_version: int) -> AgentData:
         messages = list(kwargs["raw_prompt"])
         multi_modal_data = await self.process_vision_info(messages)
-        image_data = multi_modal_data.get("images")
-        video_data = multi_modal_data.get("videos")
+        # Convert plural keys to singular keys for backend compatibility
+        multi_modal_data = {k.rstrip("s"): v for k, v in multi_modal_data.items() if v is not None}
         metrics = {}
         request_id = uuid4().hex
         tools_kwargs = kwargs.get("tools_kwargs", {})
@@ -107,8 +107,7 @@ class AsyncPartialToolAgentLoop(ToolAgentLoop):
         # Create AgentData instance to encapsulate all state
         agent_data = AgentData(
             messages=messages,
-            image_data=image_data,
-            video_data=video_data,
+            multi_modal_data=multi_modal_data,
             metrics=metrics,
             request_id=request_id,
             tools_kwargs=tools_kwargs,
@@ -175,8 +174,7 @@ class AsyncPartialToolAgentLoop(ToolAgentLoop):
                     request_id=agent_data.request_id,
                     prompt_ids=agent_data.prompt_ids,
                     sampling_params=sampling_params,
-                    image_data=agent_data.image_data,
-                    video_data=agent_data.video_data,
+                    multi_modal_data=agent_data.multi_modal_data,
                 )
 
                 if is_cancel:
@@ -198,8 +196,7 @@ class AsyncPartialToolAgentLoop(ToolAgentLoop):
                     request_id=agent_data.request_id,
                     prompt_ids=agent_data.prompt_ids,
                     sampling_params=sampling_params,
-                    image_data=agent_data.image_data,
-                    video_data=agent_data.video_data,
+                    multi_modal_data=agent_data.multi_modal_data,
                 )
                 response_ids = output.token_ids
                 log_probs = output.log_probs
@@ -241,17 +238,12 @@ class AsyncPartialToolAgentLoop(ToolAgentLoop):
         """build completed output"""
         response_ids = agent_data.prompt_ids[-len(agent_data.response_mask) :]
         prompt_ids = agent_data.prompt_ids[: len(agent_data.prompt_ids) - len(agent_data.response_mask)]
-        multi_modal_data = {}
-        if agent_data.image_data is not None:
-            multi_modal_data["image"] = agent_data.image_data
-        if agent_data.video_data is not None:
-            multi_modal_data["video"] = agent_data.video_data
 
         output = AgentLoopOutput(
             prompt_ids=prompt_ids,
             response_ids=response_ids[: self.response_length],
             response_mask=agent_data.response_mask[: self.response_length],
-            multi_modal_data=multi_modal_data,
+            multi_modal_data=agent_data.multi_modal_data,
             response_logprobs=agent_data.response_logprobs[: self.response_length]
             if agent_data.response_logprobs
             else None,

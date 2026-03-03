@@ -55,17 +55,15 @@ class AgentData:
     def __init__(
         self,
         messages: list[dict[str, Any]],
-        image_data: list[Image.Image],
-        video_data: list[tuple[torch.Tensor, dict[str, Any]]],
-        metrics: dict[str, Any],
-        request_id: str,
-        tools_kwargs: dict[str, Any],
+        multi_modal_data: Optional[dict[str, Any]] = None,
+        metrics: dict[str, Any] = None,
+        request_id: str = None,
+        tools_kwargs: dict[str, Any] = None,
         interaction: Optional[BaseInteraction] = None,
         interaction_kwargs: Optional[dict[str, Any]] = None,
     ):
         self.messages = messages
-        self.image_data = image_data
-        self.video_data = video_data
+        self.multi_modal_data = multi_modal_data or {}
         self.metrics = metrics
         self.request_id = request_id
         self.tools_kwargs = tools_kwargs
@@ -89,6 +87,32 @@ class AgentData:
 
         # Extra fields for dynamic addition, e.g., tool session data
         self.extra_fields: dict[str, Any] = {}
+
+    @property
+    def image_data(self) -> Optional[list[Image.Image]]:
+        """Backward compatible accessor for image data."""
+        return self.multi_modal_data.get("image")
+
+    @image_data.setter
+    def image_data(self, value: Optional[list[Image.Image]]):
+        """Backward compatible setter for image data."""
+        if value is not None:
+            self.multi_modal_data["image"] = value
+        elif "image" in self.multi_modal_data:
+            del self.multi_modal_data["image"]
+
+    @property
+    def video_data(self) -> Optional[list[tuple[torch.Tensor, dict[str, Any]]]]:
+        """Backward compatible accessor for video data."""
+        return self.multi_modal_data.get("video")
+
+    @video_data.setter
+    def video_data(self, value: Optional[list[tuple[torch.Tensor, dict[str, Any]]]]):
+        """Backward compatible setter for video data."""
+        if value is not None:
+            self.multi_modal_data["video"] = value
+        elif "video" in self.multi_modal_data:
+            del self.multi_modal_data["video"]
 
 
 @register("tool_agent")
@@ -125,8 +149,8 @@ class ToolAgentLoop(AgentLoopBase):
 
         # extract images and videos from messages
         multi_modal_data = await self.process_vision_info(messages)
-        images = multi_modal_data.get("images")
-        videos = multi_modal_data.get("videos")
+        # Convert plural keys to singular keys for backend compatibility
+        multi_modal_data = {k.rstrip("s"): v for k, v in multi_modal_data.items() if v is not None}
 
         metrics = {}
         request_id = uuid4().hex
@@ -150,8 +174,7 @@ class ToolAgentLoop(AgentLoopBase):
         # Create AgentData instance to encapsulate all state
         agent_data = AgentData(
             messages=messages,
-            image_data=images,
-            video_data=videos,
+            multi_modal_data=multi_modal_data,
             metrics=metrics,
             request_id=request_id,
             tools_kwargs=tools_kwargs,
@@ -177,16 +200,11 @@ class ToolAgentLoop(AgentLoopBase):
         # Finalize output
         response_ids = agent_data.prompt_ids[-len(agent_data.response_mask) :]
         prompt_ids = agent_data.prompt_ids[: len(agent_data.prompt_ids) - len(agent_data.response_mask)]
-        multi_modal_data = {}
-        if agent_data.image_data is not None:
-            multi_modal_data["images"] = agent_data.image_data
-        if agent_data.video_data is not None:
-            multi_modal_data["videos"] = agent_data.video_data
         output = AgentLoopOutput(
             prompt_ids=prompt_ids,
             response_ids=response_ids[: self.response_length],
             response_mask=agent_data.response_mask[: self.response_length],
-            multi_modal_data=multi_modal_data,
+            multi_modal_data=agent_data.multi_modal_data,
             response_logprobs=agent_data.response_logprobs[: self.response_length]
             if agent_data.response_logprobs
             else None,
@@ -203,8 +221,8 @@ class ToolAgentLoop(AgentLoopBase):
         prompt_ids = await self.apply_chat_template(
             agent_data.messages,
             tools=self.tool_schemas,
-            images=agent_data.image_data,
-            videos=agent_data.video_data,
+            images=agent_data.multi_modal_data.get("image"),
+            videos=agent_data.multi_modal_data.get("video"),
         )
         agent_data.prompt_ids = prompt_ids
         return AgentState.GENERATING
@@ -220,8 +238,7 @@ class ToolAgentLoop(AgentLoopBase):
                 request_id=agent_data.request_id,
                 prompt_ids=agent_data.prompt_ids,
                 sampling_params=sampling_params,
-                image_data=agent_data.image_data,
-                video_data=agent_data.video_data,
+                multi_modal_data=agent_data.multi_modal_data,
             )
         # first time to set num_preempted
         if agent_data.metrics.get("num_preempted") is None:
@@ -356,12 +373,13 @@ class ToolAgentLoop(AgentLoopBase):
         # Update prompt_ids and response_mask
 
         if new_images_this_turn:
-            if agent_data.image_data is None:
-                agent_data.image_data = []
-            elif not isinstance(agent_data.image_data, list):
-                agent_data.image_data = [agent_data.image_data]
+            # Update multi_modal_data with new images
+            if "image" not in agent_data.multi_modal_data:
+                agent_data.multi_modal_data["image"] = []
+            elif not isinstance(agent_data.multi_modal_data["image"], list):
+                agent_data.multi_modal_data["image"] = [agent_data.multi_modal_data["image"]]
             for img in new_images_this_turn:
-                agent_data.image_data.append(img)
+                agent_data.multi_modal_data["image"].append(img)
 
         agent_data.prompt_ids += response_ids
         agent_data.response_mask += [0] * len(response_ids)
